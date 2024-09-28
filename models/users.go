@@ -1,6 +1,11 @@
 package models
 
-import "example.com/gin-project/db"
+import (
+	"errors"
+
+	"example.com/gin-project/db"
+	"example.com/gin-project/utils"
+)
 
 type User struct {
 	ID int64
@@ -22,7 +27,13 @@ func (u *User) Save() error {
 
 	defer statement.Close()
 
-	result, err := statement.Exec(u.Email, u.Password)
+	passwordHash, err := utils.HashPassword(u.Password)
+
+	if err != nil {
+		return err
+	}
+
+	result, err := statement.Exec(u.Email, passwordHash)
 
 	if err != nil {
 		return err
@@ -33,3 +44,27 @@ func (u *User) Save() error {
 
 	return err
 }
+
+func (u User) ValidateCredentials() error {
+	query := `
+		SELECT password FROM users
+		WHERE email = ?
+	`
+
+	row := db.DB.QueryRow(query, u.Email)
+
+	var passwordDb string
+	err := row.Scan(&passwordDb)
+
+	if err != nil {
+		return err
+	}
+
+	isValidPassword := utils.ComparePasswords(u.Password, passwordDb)
+
+	if !isValidPassword {
+		return errors.New("invalid password")
+	}
+
+	return nil
+} 
