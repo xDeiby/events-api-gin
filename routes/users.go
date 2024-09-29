@@ -5,13 +5,34 @@ import (
 	"net/http"
 
 	"example.com/gin-project/models"
+	"example.com/gin-project/utils"
 	"github.com/gin-gonic/gin"
 )
 
 func signUp(context *gin.Context) {
+	token := context.Request.Header.Get("Authorization")
+
+	if token == "" {
+		context.JSON(http.StatusUnauthorized, gin.H{
+			"message": "Not authorized",
+		})
+		
+		return
+	}
+
+	_, err := utils.VerifyToken(token)
+
+	if err != nil {
+		context.JSON(http.StatusUnauthorized, gin.H{
+			"message": "Not authorized",
+		})
+		
+		return	
+	}
+
 	var user models.User
 
-	err := context.ShouldBindJSON(&user)
+	err = context.ShouldBindJSON(&user)
 
 	if err != nil {
 		fmt.Println(err)
@@ -51,7 +72,15 @@ func login(context *gin.Context) {
 		})
 	}
 
+	token, err := utils.GenerateToken(user.Email, user.ID)
+
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Authentication failed to generate token",
+		})
+	}
+
 	context.JSON(http.StatusOK, gin.H{
-		"message": "Authentication successfully",
+		"accessToken": token,
 	})
 }
